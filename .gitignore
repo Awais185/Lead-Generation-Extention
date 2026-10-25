@@ -1,0 +1,15 @@
+# Python / Django
+venv/
+__pycache__/
+*.pyc
+db.sqlite3
+db.sqlite3.backup
+.env
+
+# Django Worker
+django-worker/
+
+# Extensions & OS
+.DS_Store
+node_modules/
+.wrangler/

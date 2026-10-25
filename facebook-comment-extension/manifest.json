@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "FB & LinkedIn Auto Client Finder",
+  "version": "1.1",
+  "description": "Auto comments on relevant Facebook & LinkedIn posts and joins FB groups",
+  "permissions": [
+    "activeTab", 
+    "scripting", 
+    "storage", 
+    "debugger",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://*.facebook.com/*", 
+    "https://*.linkedin.com/*",
+    "http://localhost:8000/*"
+  ],
+  "background": { 
+    "service_worker": "background.js" 
+  },
+  "action": { 
+    "default_popup": "popup.html" 
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.facebook.com/*"],
+      "js": ["content.js", "group_joiner.js"],
+      "css": ["content.css"]
+    },
+    {
+      "matches": ["https://*.linkedin.com/*"],
+      "js": ["linkedin_content.js"]
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { width: 340px; font-family: Arial, sans-serif; padding: 15px; background: #f0f2f5; margin: 0; }
+    h2 { margin-top: 0; color: #1877f2; font-size: 18px; text-align: center; margin-bottom: 15px;}
+    h3 { font-size: 14px; color: #65676b; margin: 10px 0 5px 0; text-transform: uppercase; border-bottom: 2px solid #ddd; padding-bottom: 5px;}
+    .stat-box { background: white; padding: 8px 10px; margin-bottom: 6px; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); display: flex; justify-content: space-between; }
+    .stat-label { color: #65676b; font-weight: bold; font-size: 12px; }
+    .stat-value { color: #1c1e21; font-weight: bold; font-size: 13px;}
+    .feature-row { display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px; margin-bottom: 6px; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+    .feature-name { font-weight: bold; font-size: 13px; color: #1c1e21; }
+    .switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 20px; }
+    .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+    input:checked + .slider { background-color: #1877f2; }
+    input:checked + .slider:before { transform: translateX(16px); }
+    input:checked + .slider.li-slider { background-color: #0a66c2; }
+  </style>
+</head>
+<body>
+  <h2>🤖 Auto Client Finder</h2>
+  
+  <!-- FACEBOOK SECTION -->
+  <h3>Facebook (Today)</h3>
+  <div class="feature-row">
+    <span class="feature-name">Leads Finder (Comments)</span>
+    <label class="switch"><input type="checkbox" id="toggle_leads" checked><span class="slider"></span></label>
+  </div>
+  <div class="feature-row">
+    <span class="feature-name">Group Joiner</span>
+    <label class="switch"><input type="checkbox" id="toggle_groups" checked><span class="slider"></span></label>
+  </div>
+  
+  <div class="stat-box"><span class="stat-label">FB Posts Scanned:</span><span class="stat-value" id="fb_scanned">0</span></div>
+  <div class="stat-box"><span class="stat-label">FB Leads Found:</span><span class="stat-value" id="fb_leads">0</span></div>
+  <div class="stat-box"><span class="stat-label">FB Comments Posted:</span><span class="stat-value" id="fb_posted" style="color: green;">0</span></div>
+  <div class="stat-box"><span class="stat-label">FB Failed:</span><span class="stat-value" id="fb_failed" style="color: red;">0</span></div>
+  <div class="stat-box"><span class="stat-label">Groups Joined Today:</span><span class="stat-value" id="groups_joined" style="color: #1877f2;">0</span></div>
+
+  <!-- LINKEDIN SECTION -->
+  <h3 style="margin-top: 15px;">LinkedIn (Today)</h3>
+  <div class="feature-row">
+    <span class="feature-name">LinkedIn Leads</span>
+    <label class="switch"><input type="checkbox" id="toggle_linkedin" checked><span class="slider li-slider"></span></label>
+  </div>
+  
+  <div class="stat-box"><span class="stat-label">LI Posts Scanned:</span><span class="stat-value" id="li_scanned">0</span></div>
+  <div class="stat-box"><span class="stat-label">LI Leads Found:</span><span class="stat-value" id="li_leads">0</span></div>
+  <div class="stat-box"><span class="stat-label">LI Comments Posted:</span><span class="stat-value" id="li_posted" style="color: green;">0</span></div>
+  <div class="stat-box"><span class="stat-label">LI Failed:</span><span class="stat-value" id="li_failed" style="color: red;">0</span></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
