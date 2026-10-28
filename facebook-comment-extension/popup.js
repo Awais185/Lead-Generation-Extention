@@ -3,20 +3,28 @@ async function loadTodayStats() {
         const response = await fetch('http://localhost:8000/api/today-stats/');
         const data = await response.json();
 
-        // Set Facebook Stats
         document.getElementById('fb_scanned').textContent = data.fb_scanned || 0;
         document.getElementById('fb_leads').textContent = data.fb_leads || 0;
         document.getElementById('fb_posted').textContent = data.fb_posted || 0;
         document.getElementById('fb_failed').textContent = data.fb_failed || 0;
         document.getElementById('groups_joined').textContent = data.groups_joined || 0;
 
-        // Set LinkedIn Stats
-        document.getElementById('li_scanned').textContent = data.li_scanned || 0; // Or separate if needed
+        document.getElementById('li_scanned').textContent = data.li_scanned || 0;
         document.getElementById('li_leads').textContent = data.li_leads || 0;
         document.getElementById('li_posted').textContent = data.li_posted || 0;
         document.getElementById('li_failed').textContent = data.li_failed || 0;
     } catch (e) {
-        console.log("Could not fetch today's stats from Django.");
+        chrome.storage.local.get(['fb_scanned', 'fb_posted', 'fb_failed', 'fb_leads', 'li_scanned', 'li_posted', 'li_failed', 'li_leads', 'groups_joined'], (data) => {
+            document.getElementById('fb_scanned').textContent = data.fb_scanned || 0;
+            document.getElementById('fb_leads').textContent = data.fb_leads || 0;
+            document.getElementById('fb_posted').textContent = data.fb_posted || 0;
+            document.getElementById('fb_failed').textContent = data.fb_failed || 0;
+            document.getElementById('groups_joined').textContent = data.groups_joined || 0;
+            document.getElementById('li_scanned').textContent = data.li_scanned || 0;
+            document.getElementById('li_leads').textContent = data.li_leads || 0;
+            document.getElementById('li_posted').textContent = data.li_posted || 0;
+            document.getElementById('li_failed').textContent = data.li_failed || 0;
+        });
     }
 }
 

@@ -1,0 +1,180 @@
+FACEBOOK EXTENSION FULL SETUP GUIDE
+==================================
+
+This file contains the complete setup steps to install the project, prepare the Python backend, load the browser extension, and start everything correctly.
+
+
+1) REQUIREMENTS
+---------------
+- Windows 10 or 11
+- Python 3.10+ recommended
+- Node.js 18+ (only if you want to run extra JS tooling later)
+- Google Chrome or Chromium-based browser
+- Git
+
+
+2) OPEN PROJECT FOLDER
+----------------------
+Open a terminal in your project's main directory (e.g., C:\path\to\your\Facbook extention).
+
+Example:
+cd "C:\path\to\your\Facbook extention"
+
+
+3) CREATE / USE PYTHON VIRTUAL ENVIRONMENT
+-----------------------------------------
+Inside the project root, create a virtual environment:
+
+python -m venv venv
+
+Then activate it:
+
+venv\Scripts\activate
+
+If the terminal shows (venv), the environment is active.
+
+
+4) INSTALL PYTHON DEPENDENCIES
+-----------------------------
+Go to the Django project folder:
+
+cd facebook
+
+Install dependencies:
+
+pip install -r requirements.txt
+
+If requirements.txt is missing in the project, install the required packages manually:
+
+pip install django djangorestframework openai
+
+If you are using a newer environment and want a safer install:
+
+pip install Django djangorestframework openai
+
+
+5) APPLY DJANGO DATABASE MIGRATIONS
+-----------------------------------
+From the project folder:
+
+cd "C:\path\to\your\Facbook extention\facebook"
+
+Run:
+
+python manage.py migrate
+
+If there are migration issues or the database is stuck, you can reset it safely for local dev:
+
+python manage.py flush
+python manage.py migrate
+
+
+6) START THE DJANGO BACKEND
+---------------------------
+From the same folder:
+
+python manage.py runserver
+
+The backend will run at:
+http://127.0.0.1:8000/
+
+Keep this terminal open while using the extension.
+
+
+7) LOAD THE CHROME EXTENSION
+----------------------------
+1. Open Google Chrome.
+2. Go to:
+   chrome://extensions/
+3. Turn on Developer mode.
+4. Click Load unpacked.
+5. Select this folder:
+
+C:\path\to\your\Facbook extention\facebook-comment-extension
+
+The extension is now installed.
+
+
+8) CHECK THE FRONTEND POPUP
+---------------------------
+Click the extension icon in the Chrome toolbar.
+The popup should load and call:
+
+http://localhost:8000/api/today-stats/
+
+If the popup shows values, the backend is connected correctly.
+
+
+9) USE THE EXTENSION ON FACEBOOK
+--------------------------------
+Open Facebook in Chrome and make sure the extension is active.
+The extension will:
+- scan Facebook posts
+- detect relevant posts for lead generation
+- comment on valid posts
+- update stats with the backend
+
+
+10) IMPORTANT NOTES
+-------------------
+- The backend must be running before using the extension.
+- Keep the Django server running in one terminal.
+- The extension connects to localhost:8000.
+- If you change the backend code, restart the Django server.
+- If the extension shows zeros or errors, verify the Django server is still running and the database is migrated.
+
+
+11) QUICK RESTART COMMANDS
+--------------------------
+If you need to restart the backend:
+
+cd "C:\path\to\your\Facbook extention\facebook"
+venv\Scripts\activate
+python manage.py runserver
+
+If you need to re-create the local database for a clean start:
+
+cd "C:\path\to\your\Facbook extention\facebook"
+venv\Scripts\activate
+python manage.py migrate --run-syncdb
+
+
+12) FULL COMMAND LIST (COPY-PASTE VERSION)
+-------------------------------------------
+cd "C:\path\to\your\Facbook extention"
+python -m venv venv
+venv\Scripts\activate
+cd facebook
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py runserver
+
+
+13) TROUBLESHOOTING
+-------------------
+Problem: Django server not running
+- Run:
+  cd "C:\path\to\your\Facbook extention\facebook"
+  venv\Scripts\activate
+  python manage.py runserver
+
+Problem: extension cannot connect to localhost:8000
+- Check the backend is running
+- Check the URL is exactly: http://127.0.0.1:8000/
+- Make sure no firewall or antivirus is blocking local requests
+
+Problem: database errors or duplicate stats errors
+- Run:
+  python manage.py migrate
+- If needed, delete the local SQLite DB for local testing only:
+  del db.sqlite3
+  python manage.py migrate
+
+Problem: extension popup shows 0 values
+- Make sure the backend is running and the extension is on Facebook
+- Refresh the extension popup
+- Check the developer console for errors
+
+
+END
+----

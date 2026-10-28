@@ -77,8 +77,14 @@ function addGroupStat() {
 }
 
 async function processGroups() {
-    let data = await new Promise(resolve => chrome.storage.local.get(['bot_state', 'feat_groups'], resolve));
+    let data = await new Promise(resolve => chrome.storage.local.get(['bot_state', 'feat_groups', 'groups_joined'], resolve));
     
+    // FIX 1: FORCE JOINING GROUPS IF WE HAVEN'T FINISHED YET
+    if (data.feat_groups !== false && (data.groups_joined || 0) < 20) {
+        await chrome.storage.local.set({ bot_state: 'JOINING_GROUPS' });
+        data.bot_state = 'JOINING_GROUPS';
+    }
+
     // If we are not in the joining state, stop
     if (data.bot_state !== 'JOINING_GROUPS') return;
 
@@ -95,7 +101,6 @@ async function processGroups() {
     
     // 5-minute timer
     while (Date.now() - startTime < 300000) { 
-        // CHECK TOGGLE MID-SESSION: If user turns it off, break the loop instantly
         let currentSettings = await new Promise(resolve => chrome.storage.local.get(['feat_groups'], resolve));
         if (currentSettings.feat_groups === false) {
             showNotification("🛑 Toggle turned OFF. Switching...");
@@ -152,7 +157,6 @@ async function processGroups() {
         await new Promise(r => setTimeout(r, 5000)); 
     }
 
-    // Timer finished OR toggle was turned off
     showNotification("✅ Group Joiner Finished. Going to Lead Finder...");
     await chrome.storage.local.set({ bot_state: 'SCANNING' });
     window.location.href = "https://www.facebook.com/groups/feed/";

@@ -1,16 +1,6 @@
 let isRunning = false;
-// UPDATED SEARCH QUERIES
-const SEARCH_QUERIES = [
-    "looking for a web developer", 
-    "need a website", 
-    "shopify developer", 
-    "AI automation developer", 
-    "n8n automation", 
-    "need SEO expert",
-    "AI engineer",
-    "machine learning engineer"
-];
-const POSTS_PER_QUERY = 40; 
+const SEARCH_QUERIES = ["looking for a web developer", "need a website", "shopify developer", "AI automation developer", "n8n automation", "need SEO expert", "AI engineer", "machine learning engineer"];
+const POSTS_PER_QUERY = 20; 
 
 function createVirtualCursor() {
   let cursor = document.getElementById('li-virtual-cursor');
@@ -35,7 +25,7 @@ function showNotification(message, isError = false) {
 }
 function addStat(key) {
   chrome.storage.local.get([key], (data) => {
-    let current = data[key] || 0;
+    let current = Number(data[key]) || 0;
     chrome.storage.local.set({ [key]: current + 1 });
   });
 }
@@ -47,7 +37,7 @@ function hasAlreadyCommented(postText) {
 }
 
 function isRelevantText(text) {
-    const keywords = ['hire', 'hiring', 'looking for', 'need a', 'need an', 'developer', 'designer', 'shopify', 'website', 'web', 'seo', 'automation', 'react', 'python', 'frontend', 'backend', 'full stack', 'ai engineer', 'machine learning'];
+    const keywords = ['hire', 'hiring', 'looking for', 'need a', 'need an', 'developer', 'designer', 'shopify', 'website', 'web', 'seo', 'automation', 'react', 'python', 'frontend', 'backend', 'full stack', 'ai engineer', 'machine learning', 'ghl'];
     const lower = text.toLowerCase();
     return keywords.some(k => lower.includes(k));
 }
@@ -59,6 +49,10 @@ async function updateStatus(dbId, status) {
             body: JSON.stringify({ db_id: dbId, status: status })
         });
     } catch(e) { console.log("Status update failed", e); }
+
+    // Keep local counters in sync with backend
+    if (status === 'POSTED') addStat('li_posted');
+    else if (status === 'FAILED') addStat('li_failed');
 }
 
 async function runLinkedInAutomation() {
@@ -85,9 +79,11 @@ async function runLinkedInAutomation() {
       return;
   }
 
-  if (!window.location.href.includes('search/results/content')) {
+  // FIXED: Check if we are on the search page AND if the URL actually matches the currentQuery
+  const expectedKeyword = encodeURIComponent(currentQuery);
+  if (!window.location.href.includes('search/results/content') || !window.location.href.includes(expectedKeyword)) {
       showNotification(`🔍 Searching: "${currentQuery}"`);
-      window.location.href = `https://www.linkedin.com/search/results/content/?keywords=${encodeURIComponent(currentQuery)}&datePosted=%22past-24h%22`;
+      window.location.href = `https://www.linkedin.com/search/results/content/?keywords=${expectedKeyword}&datePosted=%22past-24h%22`;
       isRunning = false;
       return; 
   }
@@ -100,7 +96,8 @@ async function runLinkedInAutomation() {
 
   for (let btn of allButtons) {
       const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
-      if (aria === 'comment' || aria.includes('comment on')) {
+      
+      if ((aria === 'comment' || aria.includes('comment on')) && !aria.includes('menu')) {
           let post = btn.closest('.feed-shared-update-v2') || btn.closest('article');
           if (!post) {
               let parent = btn.parentElement;
@@ -138,10 +135,8 @@ async function runLinkedInAutomation() {
   await chrome.storage.local.set({ li_scanned_in_session: scannedInSession });
   addStat('li_scanned');
 
-  // --- NEW: Increment DB Count for LI ---
   fetch('http://localhost:8000/api/increment-scanned/', {
-      method: 'POST', 
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ platform: 'li' })
   }).catch(()=>{});
 
@@ -161,9 +156,7 @@ async function runLinkedInAutomation() {
         const checkData = await checkRes.json();
         if (checkData.exists) {
             showNotification("⏭️ Skipping: Already in DB.", true);
-            isRunning = false; 
-            setTimeout(runLinkedInAutomation, 500); 
-            return;
+            isRunning = false; setTimeout(runLinkedInAutomation, 500); return;
         }
     }
 
@@ -174,32 +167,47 @@ async function runLinkedInAutomation() {
     const aiData = await aiRes.json();
 
     if (aiData.action !== 'comment' || !aiData.comment) {
-        isRunning = false; 
-        setTimeout(runLinkedInAutomation, 500); 
-        return;
+        isRunning = false; setTimeout(runLinkedInAutomation, 500); return;
     }
 
+    addStat('li_leads_found');   // AI approved → this is a real lead
+
     if (document.activeElement) document.activeElement.blur();
-    
-    const existingBoxes = new Set(Array.from(document.querySelectorAll('.ql-editor, div[contenteditable="true"]')));
+
+    // SNAPSHOT: Record how many editors exist BEFORE we click
+    const existingEditorCount = document.querySelectorAll('.ql-editor, div[contenteditable="true"]').length;
 
     const btnRect = targetBtn.getBoundingClientRect();
     moveCursorTo(btnRect.left + btnRect.width / 2, btnRect.top + btnRect.height / 2);
     await new Promise(r => setTimeout(r, 800));
+    
+    // Physically click the comment icon
     targetBtn.click();
+    targetBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    targetBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
 
     showNotification("⏳ Waiting for input box...");
     
+    // ROBUST BOX FINDING: Wait for a NEW editor to appear
     let box = null;
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 10; i++) {
         await new Promise(r => setTimeout(r, 1000));
-        let inlineBoxes = Array.from(targetPost.querySelectorAll('.ql-editor, div[contenteditable="true"]'));
-        for (let el of inlineBoxes) {
-            if (!existingBoxes.has(el) && el.getBoundingClientRect().height > 0) {
-                box = el; break;
-            }
+        
+        let allEditors = Array.from(document.querySelectorAll('.ql-editor, div[contenteditable="true"]'));
+        
+        // If a new editor appeared, grab it
+        if (allEditors.length > existingEditorCount) {
+            box = allEditors[allEditors.length - 1]; 
+            break;
         }
-        if (box) break;
+        
+        // Fallback: Look strictly inside the post
+        let inlineBoxes = Array.from(targetPost.querySelectorAll('.ql-editor, div[contenteditable="true"]'));
+        let visibleInline = inlineBoxes.filter(el => el.getBoundingClientRect().height > 0);
+        if (visibleInline.length > 0) {
+            box = visibleInline[0]; 
+            break;
+        }
     }
     
     if (!box) {
@@ -208,7 +216,13 @@ async function runLinkedInAutomation() {
         isRunning = false; setTimeout(runLinkedInAutomation, 500); return;
     }
 
+    // Force focus and click the box
     box.scrollIntoView({ block: 'center' });
+    await new Promise(r => setTimeout(r, 500));
+    box.focus();
+    box.click();
+    box.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    box.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
     await new Promise(r => setTimeout(r, 500));
 
     const boxRect = box.getBoundingClientRect();
@@ -216,11 +230,14 @@ async function runLinkedInAutomation() {
     await new Promise(r => setTimeout(r, 500));
 
     showNotification("⌨️ Typing Reply...");
+    
+    // Send to background with skipEnter: true
     const typeResult = await Promise.race([
         new Promise((resolve) => {
             chrome.runtime.sendMessage({ 
                 action: "type_comment", 
                 text: aiData.comment, 
+                skipEnter: true, 
                 x: Math.round(boxRect.left + boxRect.width / 2), 
                 y: Math.round(boxRect.top + boxRect.height / 2) 
             }, (res) => resolve(res));
@@ -231,6 +248,8 @@ async function runLinkedInAutomation() {
     await new Promise(r => setTimeout(r, 1500));
 
     let textInBox = box.innerText || box.textContent || "";
+    
+    // Fallback if debugger failed
     if (textInBox.trim().length < 5) {
         showNotification("⚠️ Debugger failed, using JS fallback...", true);
         box.focus();
@@ -247,18 +266,36 @@ async function runLinkedInAutomation() {
 
     showNotification("⏳ Submitting...");
     let submitBtn = null;
-
+    const boxRectNow = box.getBoundingClientRect();
+    
+    // AGGRESSIVE SUBMIT BUTTON FINDING
     for (let attempt = 0; attempt < 6; attempt++) {
-        const container = box.closest('form') || box.closest('.comments-comment-box') || targetPost;
-        const buttons = Array.from(container.querySelectorAll('button'));
-        
-        for (let b of buttons) {
+        const allBtns = Array.from(document.querySelectorAll('button, div[role="button"]'));
+        let minDistance = Infinity;
+
+        for (let b of allBtns) {
             if (b === targetBtn) continue;
+            
             const txt = (b.innerText || '').toLowerCase().trim();
-            if (txt === 'comment' || txt === 'post') {
+            const aria = (b.getAttribute('aria-label') || '').toLowerCase();
+            
+            // Ignore menus
+            if (txt.includes('menu') || aria.includes('menu') || txt.includes('more') || txt.includes('repost') || txt.includes('send')) continue;
+            
+            // Look for the exact submit button
+            if (txt === 'comment' || txt === 'post' || aria.includes('post comment')) {
                 const isDisabled = b.disabled || b.getAttribute('aria-disabled') === 'true';
+                
                 if (!isDisabled) {
-                    submitBtn = b; break;
+                    const rect = b.getBoundingClientRect();
+                    if (rect.height > 0 && rect.width > 0) {
+                        const distance = Math.abs(rect.top - boxRectNow.top) + Math.abs(rect.left - boxRectNow.left);
+                        // Ensure it's within a reasonable distance
+                        if (distance < minDistance && distance < 600) {
+                            minDistance = distance;
+                            submitBtn = b;
+                        }
+                    }
                 }
             }
         }
@@ -275,10 +312,17 @@ async function runLinkedInAutomation() {
         submitBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
         submitBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
         
-        showNotification("✅ Comment Posted! Waiting 30s...");
-        await new Promise(r => setTimeout(r, 3000)); 
-        updateStatus(aiData.db_id, 'POSTED');
-        await new Promise(r => setTimeout(r, 30000)); 
+        await new Promise(r => setTimeout(r, 2500)); 
+        let currentText = box.innerText || box.textContent || "";
+        
+        if (currentText.trim().length < 3) {
+            showNotification("✅ Comment Posted! Waiting 30s...");
+            updateStatus(aiData.db_id, 'POSTED');
+            await new Promise(r => setTimeout(r, 30000)); 
+        } else {
+            showNotification("⚠️ Button clicked but text is still there.", true);
+            updateStatus(aiData.db_id, 'FAILED');
+        }
     } else {
         showNotification("⚠️ Submit button not found.", true);
         updateStatus(aiData.db_id, 'FAILED');

@@ -2,6 +2,7 @@ let isRunning = false;
 let postsScannedInSession = 0;
 const COOLDOWN_MS = 150 * 1000; // 2.5 minutes
 
+// Initialize last comment time from storage
 chrome.storage.local.get(['lastCommentTime'], (r) => {
   window.lastCommentTime = r.lastCommentTime || 0;
 });
@@ -12,9 +13,10 @@ function recordComment() {
   chrome.storage.local.set({ lastCommentTime: window.lastCommentTime });
 }
 
+// Updates the Chrome local storage counters
 function addStat(key) {
   chrome.storage.local.get([key], (data) => {
-    let current = data[key] || 0;
+    let current = Number(data[key]) || 0;
     chrome.storage.local.set({ [key]: current + 1 });
   });
 }
@@ -45,18 +47,23 @@ function moveCursorTo(x, y) {
   cursor.style.left = `${x}px`; cursor.style.top = `${y}px`;
 }
 
+// ============================================================
+// ROBUST 48-HOUR TIMESTAMP CHECKER (English & Arabic)
+// ============================================================
 function isPostWithin48Hours(post) {
-  const timeElements = post.querySelectorAll('abbr, time, a[role="link"] > span, span[id*="jsc"]');
-  
-  for (const el of timeElements) {
-    const dataUtc = el.getAttribute('data-utc') || el.getAttribute('data-timestamp');
-    if (dataUtc) {
+  const dataUtcEl = post.querySelector('[data-utc], [data-timestamp]');
+  if (dataUtcEl) {
+      const dataUtc = dataUtcEl.getAttribute('data-utc') || dataUtcEl.getAttribute('data-timestamp');
       const timestamp = parseInt(dataUtc, 10);
-      const postTime = timestamp > 10000000000 ? timestamp : timestamp * 1000;
-      const hoursOld = (Date.now() - postTime) / (1000 * 60 * 60);
-      return hoursOld <= 48; 
-    }
-    
+      if (!isNaN(timestamp)) {
+          const postTime = timestamp > 10000000000 ? timestamp : timestamp * 1000;
+          const hoursOld = (Date.now() - postTime) / (1000 * 60 * 60);
+          return hoursOld <= 48; 
+      }
+  }
+
+  const timeElements = post.querySelectorAll('abbr, time, a[role="link"] > span, span[id*="jsc"]');
+  for (const el of timeElements) {
     let text = (el.innerText || el.getAttribute('aria-label') || "").toLowerCase().trim();
     if (!text) continue;
 
@@ -73,7 +80,6 @@ function isPostWithin48Hours(post) {
     if (match) {
       const amount = parseInt(match[1], 10);
       const unit = match[2].toLowerCase();
-      
       if (unit.includes('m') || unit.includes('h') || unit === 'د' || unit === 'س') return true; 
       if (unit.includes('d') || unit === 'ي') return amount <= 2; 
     }
@@ -85,7 +91,7 @@ function isPostWithin48Hours(post) {
       }
     }
   }
-  return false; 
+  return true; 
 }
 
 async function extractPostData(post) {
@@ -117,7 +123,6 @@ async function typeAndPostComment(commentBox, commentText, dbId) {
             y: Math.round(rect.top + rect.height / 2) 
         }, (res) => {
           if (chrome.runtime.lastError) { 
-              console.log("Extension context lost.");
               innerResolve(false); 
           } else { 
               innerResolve(res && res.success); 
@@ -128,6 +133,7 @@ async function typeAndPostComment(commentBox, commentText, dbId) {
         success = false; 
     }
     
+    // FIX: Update local memory AND Django Database
     if (success) {
       addStat('fb_posted');
       fetch('http://localhost:8000/api/update-status/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ db_id: dbId, status: 'POSTED' }) }).catch(()=>{});
@@ -160,10 +166,13 @@ async function fallbackToProfile(post, originalPostText) {
   return true;
 }
 
+// ============================================================
+// MAIN AUTOMATION LOOP
+// ============================================================
 async function runAutomation() {
   if (isRunning) return;
   
-  let data = await new Promise(resolve => chrome.storage.local.get(['bot_state', 'feat_leads', 'posts_scanned_in_session'], resolve));
+  let data = await new Promise(resolve => chrome.storage.local.get(['bot_state', 'feat_leads', 'posts_scanned_in_session', 'feat_groups', 'groups_joined'], resolve));
   
   if (data.posts_scanned_in_session === undefined) {
     data.posts_scanned_in_session = 0;
@@ -171,6 +180,12 @@ async function runAutomation() {
   }
 
   if (data.feat_leads === false) return;
+
+  if (data.feat_groups !== false && (data.groups_joined || 0) < 20) {
+    console.log("Waiting for Group Joiner to finish before scanning...");
+    setTimeout(runAutomation, 10000);
+    return;
+  }
 
   await chrome.storage.local.set({ bot_state: 'SCANNING' });
   isRunning = true;
@@ -213,13 +228,11 @@ async function runAutomation() {
       const postFingerprint = postText.substring(0, 50).trim();
       if (localSeen.includes(postFingerprint)) { continue; }
 
-      // FIXED COUNTER: Only count it if it's totally new
       currentCount++;
       await chrome.storage.local.set({ posts_scanned_in_session: currentCount });
       postsScannedInSession = currentCount;
       addStat('fb_scanned'); 
 
-      // --- NEW: Increment DB Count for Facebook ---
       fetch('http://localhost:8000/api/increment-scanned/', {
           method: 'POST', 
           headers: { 'Content-Type': 'application/json' },
@@ -324,9 +337,11 @@ async function checkProfileBehavior() {
     setTimeout(runAutomation, 5000);
 }
 
+// Keep-alive to prevent Chrome from freezing the tab
 setInterval(() => {
     const img = new Image();
     img.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 }, 10000); 
 
-setTimeout(() => { checkProfileBehavior(); runAutomation(); }, 3000);
+// Start the automation
+setTimeout(() => { checkProfileBehavior(); runAutomation(); }, 3000); 

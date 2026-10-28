@@ -9,7 +9,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "type_comment") {
     const tabId = sender.tab.id;
     
-    // NO TAB SWITCHING. Just attach and type.
     chrome.debugger.attach({ tabId: tabId }, "1.3", () => {
       if (chrome.runtime.lastError) {
         sendResponse({ success: false, error: chrome.runtime.lastError.message });
@@ -19,7 +18,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const x = request.x;
       const y = request.y;
 
-      // 1. Physically click (Press + Release) on the text box
+      const finishTyping = () => {
+          setTimeout(() => {
+              chrome.debugger.detach({ tabId: tabId }, () => {
+                  sendResponse({ success: true });
+              });
+          }, 1000);
+      };
+
+      // 1. Physically click the text box
       chrome.debugger.sendCommand({ tabId: tabId }, "Input.dispatchMouseEvent", { 
           type: "mousePressed", x: x, y: y, button: "left", clickCount: 1 
       }, () => {
@@ -27,26 +34,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               type: "mouseReleased", x: x, y: y, button: "left", clickCount: 1 
           }, () => {
               
-              // 2. Wait 1 second for the editor to focus
               setTimeout(() => {
-                  
-                  // 3. Use Input.insertText (Reliable for React/Quill editors)
-                  chrome.debugger.sendCommand({ tabId: tabId }, "Input.insertText", {
-                      text: request.text
-                  }, (res) => {
-                      if (chrome.runtime.lastError) {
-                          sendResponse({ success: false, error: chrome.runtime.lastError.message });
-                          chrome.debugger.detach({ tabId: tabId }, () => {});
-                          return;
-                      }
+                  const text = request.text;
+                  let i = 0;
 
-                      // 4. Detach debugger
-                      setTimeout(() => {
-                          chrome.debugger.detach({ tabId: tabId }, () => {
-                              sendResponse({ success: true });
-                          });
-                      }, 1000);
-                  });
+                  function typeChar() {
+                    if (i < text.length) {
+                      chrome.debugger.sendCommand({ tabId: tabId }, "Input.dispatchKeyEvent", {
+                        type: "char", text: text[i]
+                      }, () => {
+                        i++;
+                        setTimeout(typeChar, Math.floor(Math.random() * 30) + 30); 
+                      });
+                    } else {
+                      // Check if we should skip pressing Enter (LinkedIn)
+                      if (request.skipEnter) {
+                          finishTyping();
+                      } else {
+                          // Facebook: Press Enter to submit
+                          setTimeout(() => {
+                              chrome.debugger.sendCommand({ tabId: tabId }, "Input.dispatchKeyEvent", {
+                                  type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13
+                              }, finishTyping);
+                          }, 500);
+                      }
+                    }
+                  }
+                  typeChar(); 
               }, 1500);
           });
       });
