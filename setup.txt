@@ -176,5 +176,20 @@ Problem: extension popup shows 0 values
 - Check the developer console for errors
 
 
+
+14) AI API SETUP
+----------------
+Open your settings file:
+facebook\facebook\settings.py
+
+Add your own Cloudflare API credentials to the settings file.
+You can get a free API token and account ID from the Cloudflare website:
+https://dash.cloudflare.com/
+
+Add these lines to settings.py:
+CLOUDFLARE_ACCOUNT_ID = 'replace your cloudflare account id here'
+CLOUDFLARE_API_TOKEN = 'replace your cloudflare api token here'
+
+
 END
 ----
